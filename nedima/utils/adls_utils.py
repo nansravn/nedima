@@ -2,7 +2,7 @@ from azure.storage.filedatalake import DataLakeServiceClient
 from azure.identity import ClientSecretCredential
 import json
 
-def load_secrets(secrets_path = '../config/secrets.json'):
+def load_secrets(secrets_path = 'nedima/config/secrets.json'):
     with open(secrets_path, 'r') as fp:
         secrets = json.load(fp)
     return secrets
