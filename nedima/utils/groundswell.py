@@ -32,6 +32,19 @@ def convert_post2json_recursive(input_post_list):
     return [convert_post2json(p) for p in input_post_list]
 
 
+def get_latest_datetime(tag_latest, date_format="%Y/%m/%d"):
+    latest_datetime = tag_latest.top_posts[0].upload_time
+    if date_format == None:
+        return latest_datetime
+    elif date_format == 'date':
+        return latest_datetime.strftime("%Y%m%d")
+    elif date_format == 'time':
+        return latest_datetime.strftime("%H%M%S")
+    else:
+        return latest_datetime.strftime(date_format)
+
+
+
 def get_diff_top_posts(tag_latest, tag_dated, flag_print = True):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
@@ -75,17 +88,17 @@ def get_diff_json(tag_latest, tag_dated, flag_print = True):
     return diff_json
 
 
-def calculate_waiting_time(tag_now, tag_past, min_waiting_period=45, max_waiting_period=360, posts_to_wait=32):
-    post_now = tag_now.top_posts[0]
-    post_past = tag_past.top_posts[0]
-    idx = find_post(post_past, tag_now.top_posts)
+def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=45, max_waiting_period=450, posts_to_wait=32):
+    post_latest = tag_latest.top_posts[0]
+    post_dated = tag_dated.top_posts[0]
+    idx = find_post(post_dated, tag_latest.top_posts)
 
     # If it didn't find a known post in the latest tag inspection
     if idx == None or idx == 0:
         return min_waiting_period
     # If it did find a known post in the latest tag inspection 
     else:
-        average_post_period = (post_now.upload_time - post_past.upload_time)/idx
+        average_post_period = (post_latest.upload_time - post_dated.upload_time)/idx
         suggested_waiting_period = (posts_to_wait*average_post_period).seconds
         return np.clip(suggested_waiting_period, min_waiting_period, max_waiting_period)
 
