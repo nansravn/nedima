@@ -133,3 +133,10 @@ dmypy.json
 secrets.json
 .secret.json
 secret.json
+
+#Temporary files for pushing data to the ADLS Gen2
+/temp
+temp_posts_short.json
+.temp_posts_short.json
+temp_posts_full.json
+.temp_posts_full.json
