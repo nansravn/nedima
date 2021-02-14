@@ -1,0 +1,7 @@
+{
+    "jupyter.jupyterServerType": "local",
+    "python.pythonPath": "C:\\ProgramData\\Miniconda3\\envs\\scrap38\\python.exe",
+    "terminal.integrated.shell.windows": "C:\\WINDOWS\\System32\\cmd.exe",
+    "terminal.integrated.shellArgs.windows": ["/K", "C:\\ProgramData\\Miniconda3\\Scripts\\activate.bat C:\\ProgramData\\Miniconda3"],
+    "python.condaPath": "C:\\ProgramData\\Miniconda3\\Scripts\\conda.exe"
+}
