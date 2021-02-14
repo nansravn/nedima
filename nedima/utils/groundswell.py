@@ -88,7 +88,7 @@ def get_diff_json(tag_latest, tag_dated, flag_print = True):
     return diff_json
 
 
-def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=45, max_waiting_period=450, posts_to_wait=32):
+def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=360, max_waiting_period=600, posts_to_wait=48):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
     idx = find_post(post_dated, tag_latest.top_posts)
