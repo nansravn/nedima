@@ -77,7 +77,7 @@ def get_diff_json(tag_latest, tag_dated, flag_print = True):
     if idx == None:
         diff_json = trim_top_posts(json_latest)
         if flag_print:
-            print("[{}] {} new posts in the last {} seconds (idx was not found)".format(post_latest.upload_time, len(diff_posts), delta_seconds))
+            print("[{}] {} new posts in the last {} seconds (idx was not found)".format(post_latest.upload_time, len(diff_json), delta_seconds))
          
     # If it did find a known post in the latest tag inspection 
     else:
