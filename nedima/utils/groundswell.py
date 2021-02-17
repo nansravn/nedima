@@ -4,12 +4,23 @@ Groundswell is an util module for continuous inspection of a hashtag
 
 import numpy as np 
 
-def trim_top_posts(top_posts, delta_seconds = 40):
-    for p in range(-25,-1):
-        post_aux = top_posts[p]
-        if (post_aux.upload_time - top_posts[p+1].upload_time).seconds > delta_seconds:
-            return top_posts[:p+1]
-    return top_posts[:-12]
+ # Create new trimming function that:
+ # 1. Looks for the list of latest posts
+ # 2. Remove every post that is older than than the last post from the list of dated post
+ # 3. Return this trimmed post list
+
+def trim_posts_overlap(tag_latest, tag_dated):
+    post_dated = tag_dated.top_posts[0]
+    diff_posts = [p for p in tag_latest.top_posts if p.upload_time > post_dated.upload_time]
+    return diff_posts
+
+
+#def trim_top_posts(top_posts, delta_seconds = 40):
+#    for p in range(-25,-1):
+#        post_aux = top_posts[p]
+#        if (post_aux.upload_time - top_posts[p+1].upload_time).seconds > delta_seconds:
+#            return top_posts[:p+1]
+#    return top_posts[:-12]
 
 # Tries to locate a single post in a post_list
 # It returns None if it can't indentify the post
@@ -68,7 +79,7 @@ def get_diff_top_posts(tag_latest, tag_dated, flag_print = True):
 
     # If it didn't find a known post in the latest tag inspection
     if idx == None:
-        diff_posts = trim_top_posts(tag_latest.top_posts)
+        diff_posts = trim_posts_overlap(tag_latest, tag_dated)
         if flag_print:
             print("[TRIM] {} dated posts were removed by the trimming function".format(len(tag_latest.top_posts) - len(diff_posts)))
             print("[DIFF] {} new posts in the last {} seconds (idx was not found)".format(len(diff_posts), delta_seconds))
@@ -93,7 +104,7 @@ def get_diff_json(tag_latest, tag_dated, flag_print = True):
 
     # If it didn't find a known post in the latest tag inspection
     if idx == None:
-        diff_posts = trim_top_posts(tag_latest.top_posts)
+        diff_posts = trim_posts_overlap(tag_latest, tag_dated)
         diff_json = json_latest[:len(diff_posts)]
         if flag_print:
             print("[TRIM] {} dated posts were removed by the trimming function".format(len(tag_latest.top_posts) - len(diff_posts)))
@@ -109,7 +120,7 @@ def get_diff_json(tag_latest, tag_dated, flag_print = True):
     return diff_json
 
 
-def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=360, max_waiting_period=600, posts_to_wait=48):
+def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_waiting_period=600, posts_to_wait=51):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
     idx = find_any_post(tag_dated.top_posts[:5], tag_latest.top_posts)
@@ -119,8 +130,8 @@ def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=360, max_wa
         return min_waiting_period
     # If it didn't find a known post in the latest tag inspection, replace post_dated and idx for new values
     elif idx == None:
-        post_dated = trim_top_posts(tag_latest.top_posts)[-1]
-        idx = len(trim_top_posts(tag_latest.top_posts))
+        post_dated = trim_posts_overlap(tag_latest, tag_dated)[-1]
+        idx = len(trim_posts_overlap(tag_latest, tag_dated))
     # If it did find a known post in the latest tag inspection, then do nothing
     
     average_post_period = (post_latest.upload_time - post_dated.upload_time)/idx
