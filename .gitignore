@@ -140,3 +140,6 @@ temp_posts_short.json
 .temp_posts_short.json
 temp_posts_full.json
 .temp_posts_full.json
+
+# Sandbox script (.ipynb)
+99_sandbox.ipynb
