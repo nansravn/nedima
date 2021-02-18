@@ -15,12 +15,13 @@ def trim_posts_overlap(tag_latest, tag_dated):
     return diff_posts
 
 
-#def trim_top_posts(top_posts, delta_seconds = 40):
-#    for p in range(-25,-1):
-#        post_aux = top_posts[p]
-#        if (post_aux.upload_time - top_posts[p+1].upload_time).seconds > delta_seconds:
-#            return top_posts[:p+1]
-#    return top_posts[:-12]
+def trim_posts_delta_seconds(tag_latest, tag_dated, delta_seconds = 30):
+    diff_posts = trim_posts_overlap(tag_latest, tag_dated)
+    for p in range(-20,-1):
+        post_aux = diff_posts[p]
+        if (post_aux.upload_time - diff_posts[p+1].upload_time).seconds > delta_seconds:
+            return diff_posts[:p+1]
+    return diff_posts
 
 # Tries to locate a single post in a post_list
 # It returns None if it can't indentify the post
@@ -130,8 +131,8 @@ def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_wa
         return min_waiting_period
     # If it didn't find a known post in the latest tag inspection, replace post_dated and idx for new values
     elif idx == None:
-        post_dated = trim_posts_overlap(tag_latest, tag_dated)[-1]
-        idx = len(trim_posts_overlap(tag_latest, tag_dated))
+        post_dated = trim_posts_delta_seconds(tag_latest, tag_dated)[-1]
+        idx = len(trim_posts_delta_seconds(tag_latest, tag_dated))
     # If it did find a known post in the latest tag inspection, then do nothing
     
     average_post_period = (post_latest.upload_time - post_dated.upload_time)/idx
