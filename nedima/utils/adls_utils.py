@@ -3,21 +3,13 @@ from azure.identity import ClientSecretCredential
 
 import json
 import os
-import pickle
-import datetime as dt
 
-from nedima.utils import groundswell as gs
-
-
-def load_secrets(secrets_path = 'nedima/config/secrets.json'):
-    with open(secrets_path, 'r') as fp:
-        secrets = json.load(fp)
-    return secrets
+from nedima.utils import env_setup
 
 
 def initialize_storage_account_ad():
     try:  
-        secrets = load_secrets() 
+        secrets = env_setup.load_secrets() 
 
         credential = ClientSecretCredential(secrets['azure']['tenant_id'],\
              secrets['azure']['sp_app_id'], secrets['azure']['sp_secret'])
@@ -35,11 +27,23 @@ def dump_temp_json(input_object, file_name):
     return os.path.join('temp',file_name)
 
 
+def get_latest_datetime(tag_latest, date_format="%Y/%m/%d"):
+    latest_datetime = tag_latest.top_posts[0].upload_time
+    if date_format == None:
+        return latest_datetime
+    elif date_format == 'date':
+        return latest_datetime.strftime("%Y%m%d")
+    elif date_format == 'time':
+        return latest_datetime.strftime("%H%M%S")
+    else:
+        return latest_datetime.strftime(date_format)
+
+
 def dump_adls_json(dump_dict, tag_latest, fs_client):
     for k in dump_dict.keys():
         temp_path = dump_temp_json(dump_dict[k], "temp_"+k+".json")
-        dir_client = fs_client.get_directory_client(os.path.join("tag", "surf", k, gs.get_latest_datetime(tag_latest)))
-        json_name = gs.get_latest_datetime(tag_latest, 'time') +  "_"  +  "{:04}".format(len(dump_dict[k])) + ".json"
+        dir_client = fs_client.get_directory_client(os.path.join("tag", "surf", k, get_latest_datetime(tag_latest)))
+        json_name = get_latest_datetime(tag_latest, 'time') +  "_"  +  "{:04}".format(len(dump_dict[k])) + ".json"
         file_client = dir_client.create_file(json_name)
         with open(temp_path,'r', encoding="utf-8") as fp:
             file_contents = fp.read()
@@ -47,56 +51,3 @@ def dump_adls_json(dump_dict, tag_latest, fs_client):
         file_client.flush_data(len(file_contents))
         print("[UPLOAD] {} was uploaded to the filesystem {} in the path {}".format(k, \
             file_client.file_system_name, file_client.path_name.replace("\\","/")))
-
-
-def dump_inspection_snapshot(tag_latest, tag_dated):
-    dt_latest_inspection = tag_latest.top_posts[0].upload_time
-    dt_next_inspection = tag_latest.top_posts[0].upload_time + dt.timedelta(seconds=int(gs.calculate_waiting_time(tag_latest, tag_dated)))
-    
-    snapshot_dict = {}
-    snapshot_dict['dt_next_ispection'] = dt_next_inspection
-    snapshot_dict['tag_dated'] = tag_latest
-
-    with open(os.path.join('temp','inspection_snapshot.pickle'), "wb") as fp:
-        pickle.dump(snapshot_dict, fp)
-
-    return snapshot_dict
-
-
-def calculate_remaining_sleep_time(dt_next_inspection):
-    dt_now = dt.datetime.now()
-
-    if dt_next_inspection > dt_now:
-        return (dt_next_inspection - dt_now).seconds
-    else:
-        return 0
-
-
-def load_inspection_snapshot(flag_print = True):
-    with open(os.path.join('temp','inspection_snapshot.pickle'), "rb") as fp:
-        snapshot_dict = pickle.load(fp)
-    tag_dated = snapshot_dict['tag_dated']
-    sleep_time = calculate_remaining_sleep_time(snapshot_dict['dt_next_ispection'])
-    if flag_print:
-        print("[SNAPSHOT] Next inspection scheduled for {}. {} seconds remaining.".format(snapshot_dict['dt_next_ispection'], sleep_time))
-    return (tag_dated, sleep_time)
-
-
-def upload_file_to_directory(service_client):
-    try:
-
-        file_system_client = service_client.get_file_system_client(file_system="my-file-system")
-
-        directory_client = file_system_client.get_directory_client("my-directory")
-        
-        file_client = directory_client.create_file("uploaded-file.txt")
-        local_file = open("C:\\file-to-upload.txt",'r')
-
-        file_contents = local_file.read()
-
-        file_client.append_data(data=file_contents, offset=0, length=len(file_contents))
-
-        file_client.flush_data(len(file_contents))
-
-    except Exception as e:
-        print(e)
