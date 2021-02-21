@@ -3,24 +3,20 @@ Groundswell is an util module for continuous inspection of a hashtag
 """
 
 import numpy as np 
+import pickle
+import datetime as dt
+import os
+import random
 
- # Create new trimming function that:
- # 1. Looks for the list of latest posts
- # 2. Remove every post that is older than than the last post from the list of dated post
- # 3. Return this trimmed post list
-
-def trim_posts_overlap(tag_latest, tag_dated):
-    post_dated = tag_dated.top_posts[0]
-    diff_posts = [p for p in tag_latest.top_posts if p.upload_time > post_dated.upload_time]
-    return diff_posts
+from instagramy import InstagramHashTag
 
 
-#def trim_top_posts(top_posts, delta_seconds = 40):
-#    for p in range(-25,-1):
-#        post_aux = top_posts[p]
-#        if (post_aux.upload_time - top_posts[p+1].upload_time).seconds > delta_seconds:
-#            return top_posts[:p+1]
-#    return top_posts[:-12]
+from nedima.utils import env_setup
+
+
+##############################################
+##### KNOWN POST IDENTIFICATION SECTION  #####
+##############################################
 
 # Tries to locate a single post in a post_list
 # It returns None if it can't indentify the post
@@ -41,6 +37,11 @@ def find_any_post(targeted_posts, post_list):
             return idx
     return None
 
+
+#########################################
+##### POST INFO EXTRACTION SECTION  #####
+#########################################
+
 def convert_post2json(input_post):
     return {
         "caption":input_post.caption,
@@ -57,17 +58,26 @@ def convert_post2json_recursive(input_post_list):
     return [convert_post2json(p) for p in input_post_list]
 
 
-def get_latest_datetime(tag_latest, date_format="%Y/%m/%d"):
-    latest_datetime = tag_latest.top_posts[0].upload_time
-    if date_format == None:
-        return latest_datetime
-    elif date_format == 'date':
-        return latest_datetime.strftime("%Y%m%d")
-    elif date_format == 'time':
-        return latest_datetime.strftime("%H%M%S")
-    else:
-        return latest_datetime.strftime(date_format)
+################################################
+##### INCREMENTAL POSTS WRANGLING SECTION  #####
+################################################
 
+# 1. Looks for the list of latest posts
+# 2. Remove every post that is older than than the last post from the list of dated post
+# 3. Return this trimmed post list
+def trim_posts_overlap(tag_latest, tag_dated):
+    post_dated = tag_dated.top_posts[0]
+    diff_posts = [p for p in tag_latest.top_posts if p.upload_time > post_dated.upload_time]
+    return diff_posts
+
+
+def trim_posts_delta_seconds(tag_latest, tag_dated, delta_seconds = 30):
+    diff_posts = trim_posts_overlap(tag_latest, tag_dated)
+    for p in range(-20,-1):
+        post_aux = diff_posts[p]
+        if (post_aux.upload_time - diff_posts[p+1].upload_time).seconds > delta_seconds:
+            return diff_posts[:p+1]
+    return diff_posts
 
 
 def get_diff_top_posts(tag_latest, tag_dated, flag_print = True):
@@ -120,7 +130,18 @@ def get_diff_json(tag_latest, tag_dated, flag_print = True):
     return diff_json
 
 
-def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_waiting_period=600, posts_to_wait=51):
+def structure_inspection_json(tag_latest, tag_dated, flag_print = True):
+    inspection_json = {
+        "posts_short" : get_diff_top_posts(tag_latest, tag_dated, flag_print),
+        "posts_full" : get_diff_json(tag_latest, tag_dated, False)
+    }
+    return inspection_json
+
+###################################################
+#####  SNAPSHOTING & TIME MANAGEMENT SECTION  #####
+###################################################
+
+def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_waiting_period=600, posts_to_wait=48):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
     idx = find_any_post(tag_dated.top_posts[:5], tag_latest.top_posts)
@@ -130,8 +151,8 @@ def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_wa
         return min_waiting_period
     # If it didn't find a known post in the latest tag inspection, replace post_dated and idx for new values
     elif idx == None:
-        post_dated = trim_posts_overlap(tag_latest, tag_dated)[-1]
-        idx = len(trim_posts_overlap(tag_latest, tag_dated))
+        post_dated = trim_posts_delta_seconds(tag_latest, tag_dated)[-1]
+        idx = len(trim_posts_delta_seconds(tag_latest, tag_dated))
     # If it did find a known post in the latest tag inspection, then do nothing
     
     average_post_period = (post_latest.upload_time - post_dated.upload_time)/idx
@@ -139,3 +160,59 @@ def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_wa
     return np.clip(suggested_waiting_period, min_waiting_period, max_waiting_period)
 
 
+def dump_inspection_snapshot(tag_latest, tag_dated, inspection_hastag = "surf"):
+    dt_latest_inspection = tag_latest.top_posts[0].upload_time
+    dt_next_inspection = tag_latest.top_posts[0].upload_time + dt.timedelta(seconds=int(calculate_waiting_time(tag_latest, tag_dated)))
+    
+    snapshot_dict = {}
+    snapshot_dict['inspection_hashtag'] =  inspection_hastag
+    snapshot_dict['dt_next_ispection'] = dt_next_inspection
+    snapshot_dict['tag_dated'] = tag_latest
+
+    with open(os.path.join('temp','inspection_snapshot_'+inspection_hastag+'.pickle'), "wb") as fp:
+        pickle.dump(snapshot_dict, fp)
+
+    return snapshot_dict
+
+
+def calculate_remaining_sleep_time(dt_next_inspection):
+    dt_now = dt.datetime.now()
+
+    if dt_next_inspection > dt_now:
+        return (dt_next_inspection - dt_now).seconds
+    else:
+        return 0
+
+
+def load_inspection_snapshot(inspection_hastag = "surf", flag_print = True):
+    with open(os.path.join('temp','inspection_snapshot_'+inspection_hastag+'.pickle'), "rb") as fp:
+        snapshot_dict = pickle.load(fp)
+    tag_dated = snapshot_dict['tag_dated']
+    sleep_time = calculate_remaining_sleep_time(snapshot_dict['dt_next_ispection'])
+    if flag_print:
+        print("[SNAPSHOT] Next inspection scheduled for {}. {} seconds remaining.".format(snapshot_dict['dt_next_ispection'], sleep_time))
+    return (tag_dated, sleep_time)
+
+
+################################
+#####  INSPECTION SECTION  #####
+################################
+
+def inspect_posts(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = True):
+    random_id = random.choice(secrets_dict['instagram']['session_id'])
+    if flag_print:
+        print("[SESSION] Randomly selected the sessionid {} for the next inspection".format(random_id))
+    tag_latest = InstagramHashTag(inspection_hashtag, sessionid=random_id)
+    return tag_latest
+
+
+def start_inspection_iteration(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = True):
+    try:
+        tag_dated, sleep_time = load_inspection_snapshot(inspection_hashtag)
+    except:
+        tag_dated = inspect_posts(inspection_hashtag, secrets_dict, flag_print)
+        sleep_time = calculate_waiting_time(tag_dated, tag_dated)
+        if flag_print:
+            print("[SNAPSHOT] The snapshot couldn't be loaded. A new snapshot will be generated. Some posts may have gotten lost")
+            print("[SNAPSHOT] {} seconds remaining until next inspection".format(sleep_time))
+    return tag_dated, sleep_time
