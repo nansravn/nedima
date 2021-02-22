@@ -7,9 +7,7 @@ import pickle
 import datetime as dt
 import os
 import random
-
 from instagramy import InstagramHashTag
-
 
 from nedima.utils import env_setup
 
@@ -80,7 +78,7 @@ def trim_posts_delta_seconds(tag_latest, tag_dated, delta_seconds = 30):
     return diff_posts
 
 
-def get_diff_top_posts(tag_latest, tag_dated, flag_print = True):
+def get_diff_top_posts(tag_latest, tag_dated, flag_print = False, logging_dict = {}):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
     #delete idx = find_post(post_dated, tag_latest.top_posts)
@@ -90,22 +88,29 @@ def get_diff_top_posts(tag_latest, tag_dated, flag_print = True):
     # If it didn't find a known post in the latest tag inspection
     if idx == None:
         diff_posts = trim_posts_overlap(tag_latest, tag_dated)
+        uninspected_time = (diff_posts[-1].upload_time - post_dated.upload_time).seconds
         if flag_print:
             print("[TRIM] {} dated posts were removed by the trimming function".format(len(tag_latest.top_posts) - len(diff_posts)))
             print("[DIFF] {} new posts in the last {} seconds (idx was not found)".format(len(diff_posts), delta_seconds))
-            uninspected_time = (diff_posts[-1].upload_time - post_dated.upload_time).seconds
             print("[DIFF] Posts may have gotten lost for a period of {} seconds".format(uninspected_time))
          
     # If it did find a known post in the latest tag inspection 
     else:
         diff_posts = tag_latest.top_posts[:idx]
+        uninspected_time = 0
         if flag_print:
             print("[DIFF] {} new posts in the last {} seconds".format(idx, delta_seconds))
 
+    logging_dict['time_posts_total'] = int(delta_seconds)
+    logging_dict['time_posts_lost'] = int(uninspected_time)
+    logging_dict['time_posts_diff'] = logging_dict['time_posts_total'] - logging_dict['time_posts_lost']
+    logging_dict['n_posts_total'] = int(len(tag_latest.top_posts))
+    logging_dict['n_posts_diff'] = int(len(diff_posts))
+    logging_dict['n_posts_trim'] = logging_dict['n_posts_total'] - logging_dict['n_posts_diff']
     return convert_post2json_recursive(diff_posts)
 
 
-def get_diff_json(tag_latest, tag_dated, flag_print = True):
+def get_diff_json(tag_latest, tag_dated, flag_print = False, logging_dict = {}):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
     idx = find_any_post(tag_dated.top_posts[:5], tag_latest.top_posts)
@@ -116,24 +121,31 @@ def get_diff_json(tag_latest, tag_dated, flag_print = True):
     if idx == None:
         diff_posts = trim_posts_overlap(tag_latest, tag_dated)
         diff_json = json_latest[:len(diff_posts)]
+        uninspected_time = (diff_posts[-1].upload_time - post_dated.upload_time).seconds
         if flag_print:
             print("[TRIM] {} dated posts were removed by the trimming function".format(len(tag_latest.top_posts) - len(diff_posts)))
             print("[DIFF] {} new posts in the last {} seconds (idx was not found)".format(len(diff_json), delta_seconds))
-            uninspected_time = (diff_posts[-1].upload_time - post_dated.upload_time).seconds
             print("[DIFF] Posts may have gotten lost for a period of {} seconds".format(uninspected_time))
     # If it did find a known post in the latest tag inspection 
     else:
         diff_json = json_latest[:idx]
+        uninspected_time = 0
         if flag_print:
             print("[DIFF] {} new posts in the last {} seconds".format(idx, delta_seconds))
 
+    logging_dict['time_posts_total'] = int(delta_seconds)
+    logging_dict['time_posts_lost'] = int(uninspected_time)
+    logging_dict['time_posts_diff'] = logging_dict['time_posts_total'] - logging_dict['time_posts_lost']
+    logging_dict['n_posts_total'] = int(len(tag_latest.top_posts))
+    logging_dict['n_posts_diff'] = int(len(diff_json))
+    logging_dict['n_posts_trim'] = logging_dict['n_posts_total'] - logging_dict['n_posts_diff']
     return diff_json
 
 
-def structure_inspection_json(tag_latest, tag_dated, flag_print = True):
+def structure_inspection_json(tag_latest, tag_dated, flag_print = False, logging_dict = {}):
     inspection_json = {
-        "posts_short" : get_diff_top_posts(tag_latest, tag_dated, flag_print),
-        "posts_full" : get_diff_json(tag_latest, tag_dated, False)
+        "posts_short" : get_diff_top_posts(tag_latest, tag_dated, flag_print, logging_dict),
+        "posts_full" : get_diff_json(tag_latest, tag_dated, False, logging_dict)
     }
     return inspection_json
 
@@ -141,7 +153,7 @@ def structure_inspection_json(tag_latest, tag_dated, flag_print = True):
 #####  SNAPSHOTING & TIME MANAGEMENT SECTION  #####
 ###################################################
 
-def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_waiting_period=600, posts_to_wait=48):
+def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_waiting_period=720, posts_to_wait=48, logging_dict = {}):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
     idx = find_any_post(tag_dated.top_posts[:5], tag_latest.top_posts)
@@ -157,12 +169,14 @@ def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_wa
     
     average_post_period = (post_latest.upload_time - post_dated.upload_time)/idx
     suggested_waiting_period = (posts_to_wait*average_post_period).seconds
-    return np.clip(suggested_waiting_period, min_waiting_period, max_waiting_period)
+    clipped_waiting_period = np.clip(suggested_waiting_period, min_waiting_period, max_waiting_period)
+    logging_dict['time_next_inspection'] = int(clipped_waiting_period)
+    return clipped_waiting_period
 
 
-def dump_inspection_snapshot(tag_latest, tag_dated, inspection_hastag = "surf"):
+def dump_inspection_snapshot(tag_latest, tag_dated, inspection_hastag = "surf", logging_dict = {}):
     dt_latest_inspection = tag_latest.top_posts[0].upload_time
-    dt_next_inspection = tag_latest.top_posts[0].upload_time + dt.timedelta(seconds=int(calculate_waiting_time(tag_latest, tag_dated)))
+    dt_next_inspection = tag_latest.top_posts[0].upload_time + dt.timedelta(seconds=int(calculate_waiting_time(tag_latest, tag_dated, logging_dict = logging_dict)))
     
     snapshot_dict = {}
     snapshot_dict['inspection_hashtag'] =  inspection_hastag
@@ -198,20 +212,22 @@ def load_inspection_snapshot(inspection_hastag = "surf", flag_print = True):
 #####  INSPECTION SECTION  #####
 ################################
 
-def inspect_posts(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = True):
+def inspect_posts(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = False, logging_dict = {}):
     random_id = random.choice(secrets_dict['instagram']['session_id'])
     if flag_print:
         print("[SESSION] Randomly selected the sessionid {} for the next inspection".format(random_id))
     tag_latest = InstagramHashTag(inspection_hashtag, sessionid=random_id)
+    logging_dict['id_hashtag'] = str(inspection_hashtag)
+    logging_dict['id_instagram_session'] = str(random_id)
     return tag_latest
 
 
-def start_inspection_iteration(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = True):
+def start_inspection_iteration(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = True, logging_dict = {}):
     try:
-        tag_dated, sleep_time = load_inspection_snapshot(inspection_hashtag)
+        tag_dated, sleep_time = load_inspection_snapshot(inspection_hashtag, flag_print)
     except:
-        tag_dated = inspect_posts(inspection_hashtag, secrets_dict, flag_print)
-        sleep_time = calculate_waiting_time(tag_dated, tag_dated)
+        tag_dated = inspect_posts(inspection_hashtag, secrets_dict, logging_dict = logging_dict)
+        sleep_time = calculate_waiting_time(tag_dated, tag_dated, logging_dict = logging_dict)
         if flag_print:
             print("[SNAPSHOT] The snapshot couldn't be loaded. A new snapshot will be generated. Some posts may have gotten lost")
             print("[SNAPSHOT] {} seconds remaining until next inspection".format(sleep_time))
