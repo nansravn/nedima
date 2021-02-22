@@ -1,0 +1,20 @@
+customEvents 
+| where timestamp > ago(48h) 
+| where name == "inspection_surf"
+| extend
+    n_posts_total = toint(parse_json(customDimensions)["n_posts_total"]),
+    n_posts_diff = toint(parse_json(customDimensions)["n_posts_diff"]),
+    n_posts_trim = toint(parse_json(customDimensions)["n_posts_trim"]),
+    time_posts_total = toint(parse_json(customDimensions)["time_posts_total"]),
+    time_posts_diff = toint(parse_json(customDimensions)["time_posts_diff"]),
+    time_posts_lost = toint(parse_json(customDimensions)["time_posts_lost"]),
+    time_next_inspection = toint(parse_json(customDimensions)["time_next_inspection"]),
+    id_instagram_session = tostring(parse_json(customDimensions["id_instagram_session"]))
+| project
+    timestamp, n_posts_total, n_posts_diff,
+    n_posts_trim, time_posts_total, time_posts_diff,
+    time_posts_lost, time_next_inspection, id_instagram_session
+| sort by timestamp
+| project timestamp, n_posts_diff, id_instagram_session
+| summarize n_posts_diff = countif(id_instagram_session!="") by bin(timestamp,60m), id_instagram_session
+| render areachart
