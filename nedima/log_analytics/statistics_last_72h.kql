@@ -1,10 +1,7 @@
 customEvents 
-| where timestamp > ago(24h) 
+| where timestamp > ago(72h) 
 | where name == "inspection_surf"
 | extend
-    id_hashtag = tostring(parse_json(customDimensions["id_hashtag"])),
-    id_instagram_session = tostring(parse_json(customDimensions["id_instagram_session"])),
-    id_filepath = tostring(parse_json(customDimensions["id_filepath"])),
     n_posts_total = toint(parse_json(customDimensions)["n_posts_total"]),
     n_posts_diff = toint(parse_json(customDimensions)["n_posts_diff"]),
     n_posts_trim = toint(parse_json(customDimensions)["n_posts_trim"]),
@@ -15,12 +12,11 @@ customEvents
 | project
     timestamp, n_posts_total, n_posts_diff,
     n_posts_trim, time_posts_total, time_posts_diff,
-    time_posts_lost, time_next_inspection, id_instagram_session
+    time_posts_lost, time_next_inspection
 | sort by timestamp
-| project timestamp, time_next_inspection
+| project timestamp, time_posts_lost, n_posts_diff
 | summarize
-    ["MIN"] = min(time_next_inspection),
-    ["AVG"] = avg(time_next_inspection),
-    ["MAX"] = max(time_next_inspection)
-    by bin(timestamp,60m)
-| render timechart
+    ["Inspected Posts"] = sum(n_posts_diff),
+    ["Lost Inspections"] = sum(time_posts_lost) * 1s,
+    ["Latest Inspection"] = format_timespan(now() - max(timestamp), 'hh:mm:ss')
+

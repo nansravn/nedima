@@ -16,6 +16,6 @@ customEvents
 | sort by timestamp
 | project timestamp, time_posts_diff, n_posts_diff
 | summarize
-    ["Latest Inspection"] = format_timespan(now() - max(timestamp), 'hh:mm:ss'),
-    ["Inspected Time (<60m)"] = sum(time_posts_diff) * 1s,
-    ["Inspected Posts (<60m)"] = sum(n_posts_diff)
+    ["Inspected Posts"] = sum(n_posts_diff),
+    ["Inspected Time"] = sum(time_posts_diff) * 1s,
+    ["Latest Inspection"] = format_timespan(now() - max(timestamp), 'hh:mm:ss')
