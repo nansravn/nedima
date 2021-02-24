@@ -229,9 +229,9 @@ def inspect_posts(inspection_hashtag = 'surf', retries = 3, secrets_dict = env_s
         else:
             raise e
 
-    
     logging_dict['id_hashtag'] = str(inspection_hashtag)
     logging_dict['id_instagram_session'] = str(random_id)
+    logging_dict['id_viewer_username'] = str(tag_latest.viewer.username)
     return tag_latest
 
 
