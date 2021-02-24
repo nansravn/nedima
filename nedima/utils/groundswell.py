@@ -7,6 +7,7 @@ import pickle
 import datetime as dt
 import os
 import random
+import time
 from instagramy import InstagramHashTag
 
 from nedima.utils import env_setup
@@ -153,7 +154,7 @@ def structure_inspection_json(tag_latest, tag_dated, flag_print = False, logging
 #####  SNAPSHOTING & TIME MANAGEMENT SECTION  #####
 ###################################################
 
-def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_waiting_period=720, posts_to_wait=48, logging_dict = {}):
+def calculate_waiting_time(tag_latest, tag_dated, min_waiting_period=330, max_waiting_period=800, posts_to_wait=48, logging_dict = {}):
     post_latest = tag_latest.top_posts[0]
     post_dated = tag_dated.top_posts[0]
     idx = find_any_post(tag_dated.top_posts[:5], tag_latest.top_posts)
@@ -212,21 +213,33 @@ def load_inspection_snapshot(inspection_hastag = "surf", flag_print = True):
 #####  INSPECTION SECTION  #####
 ################################
 
-def inspect_posts(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = False, logging_dict = {}):
+def inspect_posts(inspection_hashtag = 'surf', retries = 3, secrets_dict = env_setup.load_secrets(), flag_print = False, logging_dict = {}):
     random_id = random.choice(secrets_dict['instagram']['session_id'])
     if flag_print:
         print("[SESSION] Randomly selected the sessionid {} for the next inspection".format(random_id))
-    tag_latest = InstagramHashTag(inspection_hashtag, sessionid=random_id)
+    try:
+        tag_latest = InstagramHashTag(inspection_hashtag, sessionid=random_id)
+    except Exception as e:
+        print(e)
+        retries -= 1
+        print('[RETRY] Inspection failed with session_id {}. {} retries left.'.format(random_id, retries))
+        time.sleep(60)
+        if retries > 0:
+            return inspect_posts(inspection_hashtag, retries, secrets_dict, flag_print, logging_dict)
+        else:
+            raise e
+
+    
     logging_dict['id_hashtag'] = str(inspection_hashtag)
     logging_dict['id_instagram_session'] = str(random_id)
     return tag_latest
 
 
-def start_inspection_iteration(inspection_hashtag = 'surf', secrets_dict = env_setup.load_secrets(), flag_print = True, logging_dict = {}):
+def start_inspection_iteration(inspection_hashtag = 'surf', retries = 3, secrets_dict = env_setup.load_secrets(), flag_print = True, logging_dict = {}):
     try:
         tag_dated, sleep_time = load_inspection_snapshot(inspection_hashtag, flag_print)
     except:
-        tag_dated = inspect_posts(inspection_hashtag, secrets_dict, logging_dict = logging_dict)
+        tag_dated = inspect_posts(inspection_hashtag, 3, secrets_dict, logging_dict = logging_dict)
         sleep_time = calculate_waiting_time(tag_dated, tag_dated, logging_dict = logging_dict)
         if flag_print:
             print("[SNAPSHOT] The snapshot couldn't be loaded. A new snapshot will be generated. Some posts may have gotten lost")
