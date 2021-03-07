@@ -44,7 +44,7 @@ def dump_adls_json(dump_dict, tag_latest, fs_client, flag_print = False,  loggin
         dir_client = fs_client.get_directory_client(os.path.join("tag", "surf", k, get_latest_datetime(tag_latest)))
         json_name = get_latest_datetime(tag_latest, 'time') +  "_"  +  "{:04}".format(len(dump_dict[k])) + ".json"
         file_client = dir_client.create_file(json_name)
-        with open(temp_path,'r', encoding="utf-8") as fp:
+        with open(temp_path,'rb') as fp:
             file_contents = fp.read()
         file_client.append_data(data=file_contents, offset=0, length=len(file_contents))
         file_client.flush_data(len(file_contents))

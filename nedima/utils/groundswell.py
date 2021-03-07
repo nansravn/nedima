@@ -49,7 +49,7 @@ def convert_post2json(input_post):
         "post_url" : input_post.post_url,
         "shortcode" : input_post.shortcode,
         "upload_time" : input_post.upload_time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "json_version" : "0.1"
+        "json_version" : "0.2"
     }
 
 
